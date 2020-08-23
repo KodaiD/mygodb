@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -35,23 +34,22 @@ type Statement struct {
 
 type Row struct {
 	ID			uint32
-	UserName	[COLUMN_USERNAME_SIZE]byte
-	Email		[COLUMN_EMAIL_SIZE]byte
+	UserName	[]byte
+	Email		[]byte
 }
 
 type Page struct {
-	rows [ROWS_PER_PAGE]*Row
+	rows [][]byte
 }
 
 type Table struct {
 	NumRows uint32
-	Pages [TABLE_MAX_PAGES]*Page
+	Pages []*Page
 }
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	table := newTable()
-	var buf bytes.Buffer
 	for {
 		printPrompt()
 		if scanner.Scan() {
@@ -78,7 +76,7 @@ func main() {
 				fmt.Printf("Unrecognized keyword at start of '%s'.\n", inputBuffer)
 				continue
 			}
-			switch executeStatement(statement, table, &buf) {
+			switch executeStatement(statement, table) {
 			case EXECUTE_SUCCESS:
 				fmt.Println("Executed.")
 				break
@@ -120,54 +118,68 @@ func prepareStatement(inputBuffer string, statement *Statement) PrepareResult {
 	return PREPARE_UNRECOGNIZED_STATEMENT
 }
 
-func executeInsert(statement *Statement, table *Table, buf *bytes.Buffer) ExecuteResult {
+func executeInsert(statement *Statement, table *Table) ExecuteResult {
 	if table.NumRows >= TABLE_MAX_ROWS {
 		return EXECUTE_TABLE_FULL
 	}
 	row := &statement.RowToInsert
-	err := row.serializeRow(buf)
-	if err != nil {
-		log.Println(err)
-	}
+	serializeRow(table, row)
 	table.NumRows += 1
 	return EXECUTE_SUCCESS
 }
 
-func executeSelect(statement *Statement, table *Table, buf *bytes.Buffer) ExecuteResult {
+func executeSelect(statement *Statement, table *Table) ExecuteResult {
 	row := &statement.RowToInsert
 	for i := uint32(0); i < table.NumRows; i++ {
-		err := row.deserializeRow(buf)
-		if err != nil {
-			log.Println(err)
-		}
+		deserializeRow(table, row)
 		row.printRow()
 	}
 	return EXECUTE_SUCCESS
 }
 
-func executeStatement(statement *Statement, table *Table, buf *bytes.Buffer) ExecuteResult {
+func executeStatement(statement *Statement, table *Table) ExecuteResult {
 	switch statement.Type {
 	case STATEMENT_INSERT:
-		return executeInsert(statement, table, buf)
+		return executeInsert(statement, table)
 	case STATEMENT_SELECT:
-		fmt.Println("This is where we would do a select.")
-		return executeSelect(statement, table, buf)
+		return executeSelect(statement, table)
+	default:
+		fmt.Println("Warning...")
+		return EXECUTE_SUCCESS
 	}
 }
 
-func (r *Row) serializeRow(buf *bytes.Buffer) error {
-	err := binary.Write(buf, binary.BigEndian, r)
-	return err
+func serializeRow(table *Table, r *Row) {
+	pn, rn := table.rowSlot()
+	buf := make([][]byte, ROWS_PER_PAGE)
+	table.Pages[pn] = &Page{rows: buf}
+	page := table.Pages[pn]
+	bID := make([]byte, 4)
+	binary.BigEndian.PutUint32(bID, r.ID)
+	copy(page.rows[rn+1][:], bID)
+	fmt.Println(page.rows[rn+1])
+	copy(page.rows[rn+1][4:], r.UserName)
+	copy(page.rows[rn+1][4+USERNAME_SIZE:], r.Email)
 }
 
-func (r *Row) deserializeRow(buf *bytes.Buffer) error {
-	err := binary.Read(buf, binary.BigEndian, r)
-	return err
+func deserializeRow(table *Table, r *Row) {
+	pn, _ := table.rowSlot()
+	for i := uint32(0); i <= pn; i++ {
+		for j := uint32(0); j < ROWS_PER_PAGE; j++ {
+			fmt.Println(table.Pages[i])
+			bID := binary.BigEndian.Uint32(table.Pages[i].rows[j][:4])
+			fmt.Println(bID, table.Pages[i].rows[j][4:USERNAME_SIZE], table.Pages[i].rows[j][USERNAME_SIZE:])
+			r.ID = bID
+			copy(r.UserName, table.Pages[i].rows[j][4:USERNAME_SIZE])
+			copy(r.Email, table.Pages[i].rows[j][USERNAME_SIZE:])
+		}
+	}
 }
 
 func newTable() *Table {
 	table := &Table{
 		NumRows: 0,
+		Pages: make([]*Page, TABLE_MAX_PAGES),
 	}
 	return table
 }
@@ -176,11 +188,9 @@ func (r *Row) printRow() {
 	fmt.Printf("(%d, %s, %s)\n", r.ID, r.UserName, r.Email)
 }
 
-func (table *Table) rowSlot(rowNum uint32) uint32 {
+func (table *Table) rowSlot() (uint32, uint32) {
+	rowNum := table.NumRows
 	pageNum := rowNum / ROWS_PER_PAGE
-	page := table.Pages[pageNum]
-	if page == nil {
-		page = table.Pages[pageNum]
-	}
-	return pageNum
+	rowOffset := rowNum % ROWS_PER_PAGE
+	return pageNum, rowOffset
 }
