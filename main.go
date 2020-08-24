@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -20,6 +20,7 @@ data structure
 - Rows are serialized into a compact representation with each page
 - Pages are only allocated as needed
 - Keep a fixed-size array of pointers to pages
+- Rows are serialized to json
 */
 
 type MetaCommandResult int
@@ -131,7 +132,7 @@ func executeInsert(statement *Statement, table *Table) ExecuteResult {
 func executeSelect(statement *Statement, table *Table) ExecuteResult {
 	row := &statement.RowToInsert
 	for i := uint32(0); i < table.NumRows; i++ {
-		deserializeRow(table, row)
+		deserializeRow(table, row, i)
 		row.printRow()
 	}
 	return EXECUTE_SUCCESS
@@ -150,29 +151,22 @@ func executeStatement(statement *Statement, table *Table) ExecuteResult {
 }
 
 func serializeRow(table *Table, r *Row) {
-	pn, rn := table.rowSlot()
+	data, err := json.Marshal(r)
+	if err != nil {
+		fmt.Println("---", err)
+	}
+	pn, rn := table.rowSlot(table.NumRows)
 	buf := make([][]byte, ROWS_PER_PAGE)
 	table.Pages[pn] = &Page{rows: buf}
-	page := table.Pages[pn]
-	bID := make([]byte, 4)
-	binary.BigEndian.PutUint32(bID, r.ID)
-	copy(page.rows[rn+1][:], bID)
-	fmt.Println(page.rows[rn+1])
-	copy(page.rows[rn+1][4:], r.UserName)
-	copy(page.rows[rn+1][4+USERNAME_SIZE:], r.Email)
+	table.Pages[pn].rows[rn] = data
 }
 
-func deserializeRow(table *Table, r *Row) {
-	pn, _ := table.rowSlot()
-	for i := uint32(0); i <= pn; i++ {
-		for j := uint32(0); j < ROWS_PER_PAGE; j++ {
-			fmt.Println(table.Pages[i])
-			bID := binary.BigEndian.Uint32(table.Pages[i].rows[j][:4])
-			fmt.Println(bID, table.Pages[i].rows[j][4:USERNAME_SIZE], table.Pages[i].rows[j][USERNAME_SIZE:])
-			r.ID = bID
-			copy(r.UserName, table.Pages[i].rows[j][4:USERNAME_SIZE])
-			copy(r.Email, table.Pages[i].rows[j][USERNAME_SIZE:])
-		}
+func deserializeRow(table *Table, r *Row, i uint32) {
+	pn, rn := table.rowSlot(i)
+	data := table.Pages[pn].rows[rn]
+	err := json.Unmarshal(data, r)
+	if err != nil {
+		fmt.Println("+++", err)
 	}
 }
 
@@ -188,8 +182,7 @@ func (r *Row) printRow() {
 	fmt.Printf("(%d, %s, %s)\n", r.ID, r.UserName, r.Email)
 }
 
-func (table *Table) rowSlot() (uint32, uint32) {
-	rowNum := table.NumRows
+func (table *Table) rowSlot(rowNum uint32) (uint32, uint32) {
 	pageNum := rowNum / ROWS_PER_PAGE
 	rowOffset := rowNum % ROWS_PER_PAGE
 	return pageNum, rowOffset
