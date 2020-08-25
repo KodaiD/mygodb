@@ -1,16 +1,17 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"testing"
 )
 
-
-// TODO:
 func TestDB(t *testing.T) {
-	// NewDB()
-
-	fmt.Println("insert 1 user1 person1@example.com")
-	fmt.Println("insert 2 user2 person2@example.com")
-	fmt.Println("select")
+	testString := "insert 1 user1 person1@example.com\ninsert 2 user2 person2@example.com\nunrecognized\nselect\n.exit"
+	input := bytes.NewBuffer([]byte(testString))
+	output := &bytes.Buffer{}
+	db := newDB(input)
+	db.run(output)
+	if output.String() != testString {
+		t.Errorf("Wrong output: %v", output.String())
+	}
 }

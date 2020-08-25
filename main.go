@@ -51,7 +51,7 @@ type Table struct {
 func main() {
 	fmt.Println("Running db...")
 	db := newDB(os.Stdin)
-	db.run()
+	db.run(os.Stdout)
 }
 
 type DB struct {
@@ -59,7 +59,7 @@ type DB struct {
 	table *Table
 }
 
-func (db *DB) run() {
+func (db *DB) run(o io.Writer) {
 	for {
 		printPrompt()
 		if db.scanner.Scan() {
@@ -71,7 +71,7 @@ func (db *DB) run() {
 				case META_COMMAND_SUCCESS:
 					continue
 				case META_COMMAND_UNRECOGNIZED_COMMAND:
-					fmt.Printf("Unrecognized command '%s' .\n", inputBuffer)
+					fmt.Fprintf(o, "Unrecognized command '%s' .\n", inputBuffer)
 					continue
 				}
 			}
@@ -80,18 +80,18 @@ func (db *DB) run() {
 			case PREPARE_SUCCESS:
 				break
 			case PREPARE_SYNTAXERROR:
-				fmt.Println("Syntax error. Could not parse statement.")
+				fmt.Fprintln(o, "Syntax error. Could not parse statement.")
 				continue
 			case PREPARE_UNRECOGNIZED_STATEMENT:
-				fmt.Printf("Unrecognized keyword at start of '%s'.\n", inputBuffer)
+				fmt.Fprintf(o, "Unrecognized keyword at start of '%s'.\n", inputBuffer)
 				continue
 			}
 			switch executeStatement(statement, db.table) {
 			case EXECUTE_SUCCESS:
-				fmt.Println("Executed.")
+				fmt.Fprintln(o, "Executed.")
 				break
 			case EXECUTE_TABLE_FULL:
-				fmt.Println("Error: Table full.")
+				fmt.Fprintln(o, "Error: Table full.")
 				break
 			}
 		}
