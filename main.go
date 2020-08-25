@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 )
@@ -20,7 +21,6 @@ data structure
 - Rows are serialized into a compact representation with each page
 - Pages are only allocated as needed
 - Keep a fixed-size array of pointers to pages
-- Rows are serialized to json
 */
 
 type MetaCommandResult int
@@ -49,12 +49,21 @@ type Table struct {
 }
 
 func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	table := newTable()
+	fmt.Println("Running db...")
+	db := newDB(os.Stdin)
+	db.run()
+}
+
+type DB struct {
+	scanner *bufio.Scanner
+	table *Table
+}
+
+func (db *DB) run() {
 	for {
 		printPrompt()
-		if scanner.Scan() {
-			inputBuffer := scanner.Text()
+		if db.scanner.Scan() {
+			inputBuffer := db.scanner.Text()
 			if inputBuffer[0] == '.' {
 				switch doMetaCommand(inputBuffer) {
 				case META_COMMAND_EXIT:
@@ -77,7 +86,7 @@ func main() {
 				fmt.Printf("Unrecognized keyword at start of '%s'.\n", inputBuffer)
 				continue
 			}
-			switch executeStatement(statement, table) {
+			switch executeStatement(statement, db.table) {
 			case EXECUTE_SUCCESS:
 				fmt.Println("Executed.")
 				break
@@ -87,6 +96,14 @@ func main() {
 			}
 		}
 	}
+}
+
+func newDB(output io.Reader) *DB {
+	db := &DB{
+		scanner: bufio.NewScanner(output),
+		table: newTable(),
+	}
+	return db
 }
 
 func printPrompt() {
