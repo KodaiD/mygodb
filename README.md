@@ -19,4 +19,5 @@ db >
 - ~~serializer and deserializer~~
 - ~~save data in memory~~
 - WAL
+- persistence to disk
 - b-tree
