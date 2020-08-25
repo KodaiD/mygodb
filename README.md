@@ -17,6 +17,6 @@ db >
 - ~~small sql parser and vm (support insert and select)~~
 - ~~datastructure (table, page, row) using array~~
 - ~~serializer and deserializer~~
-- save data in memory
+- ~~save data in memory~~
 - WAL
 - b-tree
