@@ -156,8 +156,6 @@ func serializeRow(table *Table, r *Row) {
 		fmt.Println("---", err)
 	}
 	pn, rn := table.rowSlot(table.NumRows)
-	buf := make([][]byte, ROWS_PER_PAGE)
-	table.Pages[pn] = &Page{rows: buf}
 	table.Pages[pn].rows[rn] = data
 }
 
@@ -174,6 +172,10 @@ func newTable() *Table {
 	table := &Table{
 		NumRows: 0,
 		Pages: make([]*Page, TABLE_MAX_PAGES),
+	}
+	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
+		buf := make([][]byte, ROWS_PER_PAGE)
+		table.Pages[i] =  &Page{rows: buf}
 	}
 	return table
 }
