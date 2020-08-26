@@ -34,18 +34,23 @@ type Statement struct {
 }
 
 type Row struct {
-	ID			uint32
-	UserName	[]byte
-	Email		[]byte
+	ID		 uint32
+	UserName []byte
+	Email	 []byte
 }
 
 type Page struct {
 	rows [][]byte
 }
 
+type Pager struct {
+	fileDescriptor io.Reader
+	Pages          []*Page
+}
+
 type Table struct {
 	NumRows uint32
-	Pages []*Page
+	Pager   *Pager
 }
 
 func main() {
@@ -105,6 +110,23 @@ func newDB(output io.Reader) *DB {
 	}
 	return db
 }
+
+func newPager() *Pager {
+	file, err := os.Open(FILE_NAME)
+	if err != nil {
+		log.Println(err)
+	}
+	p := &Pager{
+		fileDescriptor: file,
+		Pages:          make([]*Page, TABLE_MAX_PAGES),
+	}
+	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
+		buf := make([][]byte, ROWS_PER_PAGE)
+		p.Pages[i] =  &Page{rows: buf}
+	}
+	return p
+}
+
 
 func printPrompt() {
 	fmt.Print("db > ")
@@ -173,12 +195,12 @@ func serializeRow(table *Table, r *Row) {
 		fmt.Println("---", err)
 	}
 	pn, rn := table.rowSlot(table.NumRows)
-	table.Pages[pn].rows[rn] = data
+	table.Pager.Pages[pn].rows[rn] = data
 }
 
 func deserializeRow(table *Table, r *Row, i uint32) {
 	pn, rn := table.rowSlot(i)
-	data := table.Pages[pn].rows[rn]
+	data := table.Pager.Pages[pn].rows[rn]
 	err := json.Unmarshal(data, r)
 	if err != nil {
 		fmt.Println("+++", err)
@@ -188,11 +210,7 @@ func deserializeRow(table *Table, r *Row, i uint32) {
 func newTable() *Table {
 	table := &Table{
 		NumRows: 0,
-		Pages: make([]*Page, TABLE_MAX_PAGES),
-	}
-	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
-		buf := make([][]byte, ROWS_PER_PAGE)
-		table.Pages[i] =  &Page{rows: buf}
+		Pager: newPager(),
 	}
 	return table
 }

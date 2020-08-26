@@ -1,5 +1,7 @@
 package main
 
+const FILE_NAME = "data.txt"
+
 const (
 	META_COMMAND_SUCCESS 				MetaCommandResult = 0
 	META_COMMAND_UNRECOGNIZED_COMMAND 	MetaCommandResult = 1
