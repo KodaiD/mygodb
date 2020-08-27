@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 const FILE_NAME = "data.txt"
 
 const (
@@ -45,3 +47,15 @@ const (
 	ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE
 	TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES
 )
+
+func printPrompt() {
+	fmt.Print("db > ")
+}
+
+func doMetaCommand(inputBuffer string) MetaCommandResult {
+	if inputBuffer == ".exit" {
+		return META_COMMAND_EXIT
+	} else {
+		return META_COMMAND_UNRECOGNIZED_COMMAND
+	}
+}
