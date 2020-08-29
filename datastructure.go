@@ -17,9 +17,8 @@ type Statement struct {
 }
 
 type Row struct {
-	ID		 uint32
-	UserName []byte
-	Email	 []byte
+	Key   string
+	Value []byte
 }
 
 type Page struct {
@@ -51,8 +50,6 @@ func newPager() *Pager {
 	}
 	return p
 }
-
-
 
 func newTable() *Table {
 	table := &Table{

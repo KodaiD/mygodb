@@ -7,20 +7,6 @@ import (
 	"os"
 )
 
-/*
-limitations
-- support two operations: inserting a row and printing all rows
-- reside only in memory (no persistence to disk)
-- support a single, hard-coded table
-
-data structure
-- Store rows in blocks of memory called pages
-- Each page stores as many rows as it can fit
-- Rows are serialized into a compact representation with each page
-- Pages are only allocated as needed
-- Keep a fixed-size array of pointers to pages
-*/
-
 type DB struct {
 	scanner *bufio.Scanner
 	table *Table
