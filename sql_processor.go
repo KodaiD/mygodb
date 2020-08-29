@@ -60,13 +60,15 @@ func serializeRow(table *Table, r *Row) {
 	if err != nil {
 		fmt.Println("---", err)
 	}
+	rowLength := uint8(len(data))
 	pn, rn := table.rowSlot(table.NumRows)
-	table.Pager.Pages[pn].rows[rn] = data
+	table.Pager.Pages[pn].rows[rn][0] = rowLength
+	copy(table.Pager.Pages[pn].rows[rn][1:], data)
 }
 
 func deserializeRow(table *Table, r *Row, i uint32) {
 	pn, rn := table.rowSlot(i)
-	data := table.Pager.Pages[pn].rows[rn]
+	data := table.Pager.Pages[pn].rows[rn][1:]
 	err := json.Unmarshal(data, r)
 	if err != nil {
 		fmt.Println("+++", err)
