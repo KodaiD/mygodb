@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"os"
 )
@@ -40,7 +41,7 @@ type Table struct {
 }
 
 func newPager() *Pager {
-	file, err := os.Create(FILE_NAME)
+	file, err := os.OpenFile(FILE_NAME, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 	if err != nil {
 		log.Println(err)
 	}
@@ -52,6 +53,7 @@ func newPager() *Pager {
 		buf := make([]byte, PAGE_SIZE)
 		p.pages[i] =  &Page{buf: buf}
 	}
+	readData(p)
 	return p
 }
 
@@ -75,4 +77,14 @@ func (table *Table) closeTable()  {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func readData(pager *Pager) {
+	// TODO:
+	// とりあえず1ページのみ読み出しにする
+	err := binary.Read(pager.fileDescriptor, binary.BigEndian, pager.pages[0].buf)
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(pager.pages[0].buf)
 }
