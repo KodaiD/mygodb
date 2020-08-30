@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"log"
 	"os"
 )
@@ -64,8 +65,8 @@ func newTable() *Table {
 
 func (table *Table) closeTable()  {
 	// データの永続化
-	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
-		_, err := table.Pager.fileDescriptor.Write(table.Pager.pages[i].buf)
+	for i := uint32(0); i <= table.Pager.point; i++ {
+		err := binary.Write(table.Pager.fileDescriptor, binary.BigEndian, table.Pager.pages[i].buf)
 		if err != nil {
 			log.Println(err)
 		}
