@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 )
@@ -22,13 +21,16 @@ type Row struct {
 	Email	 []byte
 }
 
+// pointは書き込まれた値の最後の文字のインデックス
 type Page struct {
-	rows [][]byte
+	buf []byte
+	point uint32
 }
 
 type Pager struct {
-	fileDescriptor io.Reader
-	Pages          []*Page
+	fileDescriptor *os.File
+	pages          []*Page
+	point          uint32
 }
 
 type Table struct {
@@ -37,22 +39,20 @@ type Table struct {
 }
 
 func newPager() *Pager {
-	file, err := os.Open(FILE_NAME)
+	file, err := os.Create(FILE_NAME)
 	if err != nil {
 		log.Println(err)
 	}
 	p := &Pager{
 		fileDescriptor: file,
-		Pages:          make([]*Page, TABLE_MAX_PAGES),
+		pages:          make([]*Page, TABLE_MAX_PAGES),
 	}
 	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
-		buf := make([][]byte, ROWS_PER_PAGE)
-		p.Pages[i] =  &Page{rows: buf}
+		buf := make([]byte, PAGE_SIZE)
+		p.pages[i] =  &Page{buf: buf}
 	}
 	return p
 }
-
-
 
 func newTable() *Table {
 	table := &Table{
@@ -60,4 +60,18 @@ func newTable() *Table {
 		Pager: newPager(),
 	}
 	return table
+}
+
+func (table *Table) closeTable()  {
+	// データの永続化
+	for i := uint32(0); i < TABLE_MAX_PAGES; i++ {
+		_, err := table.Pager.fileDescriptor.Write(table.Pager.pages[i].buf)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	err := table.Pager.fileDescriptor.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -35,11 +36,7 @@ func executeInsert(statement *Statement, table *Table) ExecuteResult {
 }
 
 func executeSelect(statement *Statement, table *Table) ExecuteResult {
-	row := &statement.RowToInsert
-	for i := uint32(0); i < table.NumRows; i++ {
-		deserializeRow(table, row, i)
-		row.printRow()
-	}
+	deserializeRow(table)
 	return EXECUTE_SUCCESS
 }
 
@@ -56,31 +53,52 @@ func executeStatement(statement *Statement, table *Table) ExecuteResult {
 }
 
 func serializeRow(table *Table, r *Row) {
+	/*
+	how to store data:
+	データ長(4B) データ
+	 */
+	startIdx := table.Pager.pages[table.Pager.point].point
+
 	data, err := json.Marshal(r)
 	if err != nil {
-		fmt.Println("---", err)
+		log.Println("---", err)
 	}
-	rowLength := uint8(len(data))
-	pn, rn := table.rowSlot(table.NumRows)
-	table.Pager.Pages[pn].rows[rn][0] = rowLength
-	copy(table.Pager.Pages[pn].rows[rn][1:], data)
+	rowLength := uint32(len(data))
+	// pageが一杯なら他のpageに書く
+	if table.Pager.point + uint32(rowLength) + uint32(1) > PAGE_SIZE {
+		table.Pager.point++
+	}
+	buf := table.Pager.pages[table.Pager.point].buf
+	binary.BigEndian.PutUint32(buf[startIdx:startIdx+4], rowLength)
+	copy(buf[startIdx+4:], data)
+	table.Pager.pages[table.Pager.point].point += 4 + rowLength
+	table.NumRows++
 }
 
-func deserializeRow(table *Table, r *Row, i uint32) {
-	pn, rn := table.rowSlot(i)
-	data := table.Pager.Pages[pn].rows[rn][1:]
-	err := json.Unmarshal(data, r)
-	if err != nil {
-		fmt.Println("+++", err)
+func deserializeRow(table *Table) {
+	var r Row
+	var buf []byte
+	var rowLength uint32
+	var data []byte
+	for i := uint32(0); i <= table.Pager.point; i++ {
+		for j := uint32(0); j < table.Pager.pages[i].point; {
+			buf = table.Pager.pages[i].buf
+			rowLength = binary.BigEndian.Uint32(buf[j:j+4])
+			//if rowLength <= 0 {
+			//	break
+			//}
+			data = buf[j+4:j+4+rowLength]
+			err := json.Unmarshal(data, &r)
+			if err != nil {
+				log.Println("+++", err)
+			}
+			r.printRow()
+			j += rowLength + 4
+		}
 	}
+
 }
 
 func (r *Row) printRow() {
 	fmt.Printf("(%d, %s, %s)\n", r.ID, r.UserName, r.Email)
-}
-
-func (table *Table) rowSlot(rowNum uint32) (uint32, uint32) {
-	pageNum := rowNum / ROWS_PER_PAGE
-	rowOffset := rowNum % ROWS_PER_PAGE
-	return pageNum, rowOffset
 }

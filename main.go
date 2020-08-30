@@ -34,6 +34,7 @@ func (db *DB) run(o io.Writer) {
 			if inputBuffer[0] == '.' {
 				switch doMetaCommand(inputBuffer) {
 				case META_COMMAND_EXIT:
+					db.table.closeTable()
 					os.Exit(0)
 				case META_COMMAND_SUCCESS:
 					continue
